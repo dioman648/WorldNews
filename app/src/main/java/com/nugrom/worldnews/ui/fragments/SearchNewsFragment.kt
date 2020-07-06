@@ -2,53 +2,42 @@ package com.nugrom.worldnews.ui.fragments
 
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
+import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.paging.ExperimentalPagingApi
+import androidx.paging.LoadState
+import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.nugrom.worldnews.R
+import com.nugrom.worldnews.adapters.ArticleLoadStateAdapter
 import com.nugrom.worldnews.adapters.NewsAdapter
 import com.nugrom.worldnews.ui.NewsActivity
 import com.nugrom.worldnews.ui.NewsViewModel
-import com.nugrom.worldnews.util.Constants
+import com.nugrom.worldnews.util.Constants.Companion.LAST_SEARCH_QUERY
 import com.nugrom.worldnews.util.Constants.Companion.SEARCH_NEWS_TIME_DELAY
-import com.nugrom.worldnews.util.Resourse
 import kotlinx.android.synthetic.main.fragment_search_news.*
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class SearchNewsFragment:Fragment(R.layout.fragment_search_news) {
 
-    lateinit var viewModel: NewsViewModel
-    lateinit var newsAdapter: NewsAdapter
+    private lateinit var viewModel: NewsViewModel
+    private lateinit var newsAdapter: NewsAdapter
+    private var searchJob: Job? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel = (activity as NewsActivity).viewModel
         setupRecycleView()
 
-        viewModel.searchNews.observe(viewLifecycleOwner, Observer { response ->
-            when(response){
-                is Resourse.Success ->{
-                    hideProgressBar()
-                    response.data?.let {newsResponse ->
-                        newsAdapter.differ.submitList(newsResponse.articles)
-                    }
-                }
-                is Resourse.Error ->{
-                    hideProgressBar()
-                    response.message?.let {message ->
-                        println("mda error: $message")
-                    }
-                }
-                is Resourse.Loading ->{
-                    showProgressBar()
-                }
-            }
-        })
+
     }
 
     override fun onResume() {
@@ -56,13 +45,48 @@ class SearchNewsFragment:Fragment(R.layout.fragment_search_news) {
         setListeners()
     }
 
-    private fun setupRecycleView(){
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(LAST_SEARCH_QUERY, etSearch.text?.trim().toString())
+    }
+
+    private fun setupRecycleView() {
+        val decoration = DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL)
         newsAdapter = NewsAdapter()
         rvSearchNews.apply {
             layoutManager = LinearLayoutManager(activity, LinearLayoutManager.VERTICAL, false)
-            adapter = newsAdapter
+            adapter = newsAdapter.withLoadStateFooter(
+                footer = ArticleLoadStateAdapter { newsAdapter.refresh() }
+            )
+            this.addItemDecoration(decoration)
+            newsAdapter.addLoadStateListener { loadStates ->
+                rvSearchNews.isVisible = loadStates.refresh is LoadState.NotLoading
+                search_news_progress_bar.isVisible = loadStates.refresh is LoadState.Loading
+                search_news_retry_button.isVisible = loadStates.refresh is LoadState.Error
+
+                val errorState = loadStates.source.append as? LoadState.Error
+                    ?: loadStates.source.prepend as? LoadState.Error
+                    ?: loadStates.append as? LoadState.Error
+                    ?: loadStates.prepend as? LoadState.Error
+                errorState?.let {
+                    Toast.makeText(
+                        requireContext(),
+                        "\uD83D\uDE28 Так: ${it.error}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            lifecycleScope.launch {
+                viewModel.currentSearchResult?.collect {
+                    newsAdapter.submitData(it)
+                }
+            }
         }
     }
+
+
+
 
     fun hideProgressBar(){
         paginationProgressBar.visibility = View.INVISIBLE
@@ -83,16 +107,33 @@ class SearchNewsFragment:Fragment(R.layout.fragment_search_news) {
             )
         }
 
-        var job: Job? = null
         etSearch.addTextChangedListener {editable->
-            job?.cancel()
-            job = MainScope().launch {
-                delay(SEARCH_NEWS_TIME_DELAY)
-                if (!editable.isNullOrBlank()){
-                    viewModel.searchNews(editable.toString())
+            search()
+        }
+
+        search_news_retry_button.setOnClickListener {
+            newsAdapter.refresh()
+        }
+    }
+
+    private fun search(){
+        val query = etSearch.text?.trim().toString()
+        searchJob?.cancel()
+
+        searchJob = lifecycleScope.launch {
+            delay(SEARCH_NEWS_TIME_DELAY)
+            if (!query.isNullOrBlank()){
+                @OptIn(ExperimentalPagingApi::class)
+                viewModel.searchNews(query).collectLatest {
+                    newsAdapter.submitData(it)
                 }
             }
         }
     }
+
+
+
+
+
 
 }

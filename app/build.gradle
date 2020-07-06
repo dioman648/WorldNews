@@ -11,6 +11,10 @@ android {
         exclude 'META-INF/atomicfu.kotlin_module'
     }
 
+    buildFeatures {
+        dataBinding true
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -51,6 +55,11 @@ dependencies {
     def nav_version = "2.3.0"
     implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
     implementation "androidx.navigation:navigation-ui-ktx:$nav_version"
+    
+    //paging library
+    def paging_version = "3.0.0-alpha02"
+    implementation "androidx.paging:paging-runtime:$paging_version"
+
 
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.6'

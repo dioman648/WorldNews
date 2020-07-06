@@ -2,6 +2,7 @@ package com.nugrom.worldnews.ui
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.view.Menu
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavHostController
 import androidx.navigation.findNavController
@@ -25,4 +26,5 @@ class NewsActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this,viewModelProviderFactory).get(NewsViewModel::class.java)
         bottom_navigation.setupWithNavController(nav_host_fragment.findNavController())
     }
+
 }

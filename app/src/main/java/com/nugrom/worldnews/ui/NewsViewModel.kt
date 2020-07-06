@@ -1,14 +1,16 @@
 package com.nugrom.worldnews.ui
 
 import android.app.DownloadManager
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.nugrom.worldnews.models.Article
 import com.nugrom.worldnews.models.NewsResponse
 import com.nugrom.worldnews.repository.NewsRepository
 import com.nugrom.worldnews.util.Resourse
 import com.nugrom.worldnews.util.Resourse.Loading
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import retrofit2.Response
 
@@ -16,56 +18,37 @@ class NewsViewModel(
     val newsRepository: NewsRepository
 ): ViewModel(){
 
-    val breakingNews : MutableLiveData<Resourse<NewsResponse>> = MutableLiveData()
-    var breakingNewsPage = 1
-    var breakingNewsResonse: NewsResponse? = null
+//    val breakingNews : MutableLiveData<Resourse<NewsResponse>> = MutableLiveData()
+//    var breakingNewsPage = 1
+//
 
-    val searchNews : MutableLiveData<Resourse<NewsResponse>> = MutableLiveData()
-    var searchNewsPage = 1
-    var searchNewsResponse: NewsResponse? = null
+    //Start of CodeLabs Block
+    private var currentQueryValue: String? = null
 
-    init {
-        getBreakingNews("ru")
-    }
+    var currentResult: Flow<PagingData<Article>>? = null
+        private set
 
-    //viewModelScope живет пока живет текущая view_model
-    fun getBreakingNews(countryCode:String) = viewModelScope.launch {
-        breakingNews.postValue(Loading())
-        val response = newsRepository.getBreakingNews(countryCode, breakingNewsPage)
-        breakingNews.postValue(handleBreakingNewsResponse(response))
-    }
+    var currentSearchResult: Flow<PagingData<Article>>? = null
+        private set
 
-    fun searchNews(searchQuery: String) = viewModelScope.launch {
-        searchNews.postValue(Loading())
-        val response = newsRepository.searchNews(searchQuery, searchNewsPage)
-        searchNews.postValue(handleSearchNewsResponse(response))
-    }
 
-    private fun handleBreakingNewsResponse(response: Response<NewsResponse>):Resourse<NewsResponse>{
-        if (response.isSuccessful){
-            response.body()?.let { resultResponse ->
-                breakingNewsPage++
-                if (breakingNewsResonse == null) {
-                    breakingNewsResonse = resultResponse
-                }else{
-                    val oldArtcles = breakingNewsResonse?.articles
-                    println("mda oldArticles: ${oldArtcles.hashCode()}, breakingNews.articles ${breakingNewsResonse?.articles.hashCode()}")
-                    val newArticles = resultResponse.articles
-                    oldArtcles?.addAll(newArticles)
-                }
-                return Resourse.Success(breakingNewsResonse?:resultResponse)
-            }
+    fun searchNews(queryString: String): Flow<PagingData<Article>> {
+        val lastResult = currentSearchResult
+        if (queryString == currentQueryValue && lastResult != null) {
+            return lastResult
         }
-        return Resourse.Error(response.message())
+        currentQueryValue = queryString
+        val newResult: Flow<PagingData<Article>> = newsRepository.getSearchResultStream(queryString)
+            .cachedIn(viewModelScope)
+        currentSearchResult = newResult
+        return newResult
     }
 
-    private fun handleSearchNewsResponse(response: Response<NewsResponse>):Resourse<NewsResponse>{
-        if (response.isSuccessful){
-            response.body()?.let { resultResponse ->
-                return Resourse.Success(resultResponse)
-            }
-        }
-        return Resourse.Error(response.message())
+    fun getBreakingNews(): Flow<PagingData<Article>> {
+        val newResult: Flow<PagingData<Article>> = newsRepository.getBreakingNewsStream()
+            .cachedIn(viewModelScope)
+        currentResult = newResult
+        return newResult
     }
 
     fun saveArticle(article: Article) = viewModelScope.launch {
