@@ -2,12 +2,12 @@
 **Always actual news|Всегда актуальные новости**
 
 ## Used librares|Используемые библиотеки:
-  -Room
-  -Navigation Component
-  -Coroutines
-  -Retrofit
-  -Paging Library
-  -Glide
+  - Room
+  - Navigation Component
+  - Coroutines
+  - Retrofit
+  - Paging Library
+  - Glide
 
 ## List of actual news|Список горячих новостей
 <img src="https://sun9-43.userapi.com/ketu3rQGUJwCXxjwxXR-wccUYvWCyELCm5WiQg/z3cKocHo-rk.jpg" width=300>
