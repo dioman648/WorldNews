@@ -1,6 +1,8 @@
 # WorldNews
 **Always actual news|Всегда актуальные новости**
 
+![](demo.gif)
+
 ### Used librares|Используемые библиотеки:
   - Room
   - Navigation Component
